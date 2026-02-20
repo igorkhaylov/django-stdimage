@@ -1,13 +1,10 @@
 from django.apps import apps
-from django.core.files.storage import get_storage_class
 from django.core.management import BaseCommand, CommandError
-
 from stdimage.utils import render_variations
 
 
 class Command(BaseCommand):
     help = "Renders all variations of a StdImageField."
-    args = "<app.model.field app.model.field>"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -31,16 +28,16 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        replace = options.get("replace", False)
-        ignore_missing = options.get("ignore_missing", False)
-        routes = options.get("field_path", [])
+        replace = options["replace"]
+        ignore_missing = options["ignore_missing"]
+        routes = options["field_path"]
         for route in routes:
             try:
-                app_label, model_name, field_name = route.rsplit(".")
+                app_label, model_name, field_name = route.rsplit(".", 2)
             except ValueError:
                 raise CommandError(
-                    "Error parsing field_path '{}'. Use format "
-                    "<app.model.field app.model.field>.".format(route)
+                    f"Error parsing field_path '{route}'. Use format "
+                    "<app.model.field app.model.field>."
                 )
             model_class = apps.get_model(app_label, model_name)
             field = model_class._meta.get_field(field_name)
@@ -65,7 +62,7 @@ class Command(BaseCommand):
                 do_render=do_render,
                 variations=field.variations,
                 replace=replace,
-                storage=field.storage.deconstruct()[0],
+                storage=field.storage,
                 field_class=field.attr_class,
                 ignore_missing=ignore_missing,
             )
@@ -94,7 +91,6 @@ class Command(BaseCommand):
 
 
 def render_field_variations(kwargs):
-    kwargs["storage"] = get_storage_class(kwargs["storage"])()
     ignore_missing = kwargs.pop("ignore_missing")
     do_render = kwargs.pop("do_render")
     try:
@@ -105,7 +101,6 @@ def render_field_variations(kwargs):
             render_variations(**kwargs)
     except FileNotFoundError as e:
         if not ignore_missing:
-            print(ignore_missing)
             raise CommandError(
                 "Source file was not found, terminating. "
                 "Use -i/--ignore-missing to skip this error."
