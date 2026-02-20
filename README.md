@@ -119,7 +119,7 @@ and add `'stdimage'` to `INSTALLED_APP`s in your settings.py, that's it!
 
 ## Usage
 
-Now it's instally you can use either: `StdImageField` or `JPEGField`.
+Now it's installed you can use either: `StdImageField` or `JPEGField`.
 
 `StdImageField` works just like Django's own
 [ImageField](https://docs.djangoproject.com/en/dev/ref/models/fields/#imagefield)
