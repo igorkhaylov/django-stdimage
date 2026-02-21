@@ -16,15 +16,22 @@ from PIL.Image import Resampling
 
 from .validators import MinSizeValidator
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-warnings.warn(
-    "The django-stdimage is deprecated in favor of django-pictures.\n"
-    "Migration instructions are available in the README:\n"
-    "https://github.com/codingjoe/django-stdimage#migration-instructions",
-    DeprecationWarning,
-)
+# Default variations used when none are specified.
+# Covers the most common use cases for web projects:
+#   thumbnail — cropped square for avatars and grid previews
+#   small     — proportional resize for cards and listings
+#   medium    — proportional resize for article/content columns
+#   large     — proportional resize for hero and full-width banners
+DEFAULT_VARIATIONS = {
+    "thumbnail": {"width": 100, "height": 100, "crop": True},
+    "small": {"width": 400, "height": None},
+    "medium": {"width": 800, "height": None},
+    "large": {"width": 1920, "height": None},
+}
 
 
 class StdImageFileDescriptor(ImageFileDescriptor):
@@ -58,7 +65,14 @@ class StdImageFieldFile(ImageFieldFile):
 
     @staticmethod
     def is_smaller(img, variation):
-        return img.size[0] > variation["width"] or img.size[1] > variation["height"]
+        w, h = variation["width"], variation["height"]
+        if w is None and h is None:
+            return False
+        if w is None:
+            return img.size[1] > h
+        if h is None:
+            return img.size[0] > w
+        return img.size[0] > w or img.size[1] > h
 
     def render_variations(self, replace=True):
         """Render all image variations and saves them to the storage."""
@@ -81,7 +95,6 @@ class StdImageFieldFile(ImageFieldFile):
             )
             storage.delete(variation_name)
 
-        ImageFile.LOAD_TRUNCATED_IMAGES = True
         with storage.open(file_name) as f:
             with Image.open(f) as img:
                 img, save_kargs = cls.process_variation(variation, image=img)
@@ -94,17 +107,15 @@ class StdImageFieldFile(ImageFieldFile):
     @classmethod
     def process_variation(cls, variation, image):
         """Process variation before actual saving."""
-        save_kargs = {}
-        file_format = image.format
-        save_kargs["format"] = file_format
-
         resample = variation["resample"]
 
         if cls.is_smaller(image, variation):
             factor = 1
+            target_w = variation["width"] or float("inf")
+            target_h = variation["height"] or float("inf")
             while (
-                image.size[0] / factor > 2 * variation["width"]
-                and image.size[1] * 2 / factor > 2 * variation["height"]
+                image.size[0] / factor > 2 * target_w
+                and image.size[1] * 2 / factor > 2 * target_h
             ):
                 factor *= 2
             if factor > 1:
@@ -116,33 +127,37 @@ class StdImageFieldFile(ImageFieldFile):
             size = variation["width"], variation["height"]
             size = tuple(int(i) if i is not None else i for i in size)
 
-            if file_format == "JPEG":
-                # http://stackoverflow.com/a/21669827
-                image = image.convert("RGB")
-                save_kargs["optimize"] = True
-                save_kargs["quality"] = "web_high"
-                if size[0] * size[1] > 10000:  # roughly <10kb
-                    save_kargs["progressive"] = True
-
             if variation["crop"]:
                 image = ImageOps.fit(image, size, method=resample)
             else:
-                image.thumbnail(size, resample=resample)
+                # thumbnail() requires finite dimensions; replace None (unconstrained
+                # axis) with a large sentinel so PIL scales proportionally.
+                thumb_size = tuple(i if i is not None else 2**16 for i in size)
+                image.thumbnail(thumb_size, resample=resample)
 
+        image = ImageOps.exif_transpose(image)
+
+        # WebP supports RGB and RGBA. Preserve alpha when the source has transparency;
+        # otherwise use RGB for a smaller output file.
+        has_alpha = image.mode in ("RGBA", "LA", "PA") or (
+            image.mode == "P" and "transparency" in image.info
+        )
+        image = image.convert("RGBA" if has_alpha else "RGB")
+
+        save_kargs = {
+            "format": "WEBP",
+            "quality": 85,  # near-lossless for photos; good size/quality balance
+            "method": 4,  # compression effort 0-6: 4 is the balanced default
+        }
+        save_kargs.update(variation["kwargs"])
         return image, save_kargs
 
     @classmethod
     def get_variation_name(cls, file_name, variation_name):
         """Return the variation file name based on the variation."""
-        path, ext = os.path.splitext(file_name)
+        path, _ = os.path.splitext(file_name)
         path, file_name = os.path.split(path)
-        file_name = "{file_name}.{variation_name}{extension}".format(
-            **{
-                "file_name": file_name,
-                "variation_name": variation_name,
-                "extension": ext,
-            }
-        )
+        file_name = f"{file_name}.{variation_name}.webp"
         return os.path.join(path, file_name)
 
     def delete(self, save=True):
@@ -168,8 +183,8 @@ class StdImageFieldFile(ImageFieldFile):
         state.pop("variations")
         super().__setstate__(state)
         for key, value in variations.items():
-            cls = ImageFieldFile
-            field = cls.__new__(cls)
+            field_cls = ImageFieldFile
+            field = field_cls.__new__(field_cls)
             setattr(self, key, field)
             getattr(self, key).__setstate__(value)
 
@@ -236,7 +251,9 @@ class StdImageField(ImageField):
                 need to remove the orphaned files yourself.
 
         """
-        if not variations:
+        if variations is None:
+            variations = DEFAULT_VARIATIONS
+        elif not variations:
             variations = {}
         if not isinstance(variations, dict):
             msg = ('"variations" expects a dict,' " but got %s") % type(variations)
@@ -262,10 +279,8 @@ class StdImageField(ImageField):
                 max(self.variations.values(), key=lambda x: x["height"])["height"],
             )
 
+        kwargs.setdefault("max_length", 500)
         super().__init__(verbose_name=verbose_name, name=name, **kwargs)
-
-        # The attribute name of the old file to use on the model object
-        self._old_attname = "_old_%s" % name
 
     def add_variation(self, name, params):
         variation = self.def_variation.copy()
@@ -303,6 +318,7 @@ class StdImageField(ImageField):
     def contribute_to_class(self, cls, name):
         """Generate all operations on specified signals."""
         super().contribute_to_class(cls, name)
+        self._old_attname = f"_old_{self.name}"
         signals.post_init.connect(self.set_variations, sender=cls)
         if self.delete_orphans:
             signals.post_delete.connect(self.post_delete_callback, sender=cls)

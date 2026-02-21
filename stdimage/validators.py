@@ -9,8 +9,8 @@ from PIL import Image
 class BaseSizeValidator(BaseValidator):
     """Base validator that validates the size of an image."""
 
-    def compare(self, x):
-        return True
+    def compare(self, *_):
+        raise NotImplementedError("Subclasses must implement compare()")
 
     def __init__(self, width, height):
         self.limit_value = width or float("inf"), height or float("inf")
@@ -27,8 +27,8 @@ class BaseSizeValidator(BaseValidator):
     @staticmethod
     def clean(value):
         value.seek(0)
-        stream = BytesIO(value.read())
-        size = Image.open(stream).size
+        with Image.open(BytesIO(value.read())) as img:
+            size = img.size
         value.seek(0)
         return size
 

@@ -25,7 +25,7 @@ class Command(BaseCommand):
             action="store_true",
             dest="ignore_missing",
             default=False,
-            help="Ignore missing source file error and " "skip render for that file",
+            help="Ignore missing source file error and skip render for that file",
         )
 
     def handle(self, *args, **options):
@@ -44,15 +44,15 @@ class Command(BaseCommand):
             field = model_class._meta.get_field(field_name)
 
             queryset = model_class._default_manager.exclude(
-                **{"%s__isnull" % field_name: True}
+                **{f"{field_name}__isnull": True}
             ).exclude(**{field_name: ""})
             obj = queryset.first()
             do_render = True
             if obj:
                 f = getattr(obj, field_name)
                 do_render = f.field.render_variations
-            images = queryset.values_list(field_name, flat=True).iterator()
             count = queryset.count()
+            images = queryset.values_list(field_name, flat=True).iterator()
 
             self.render(field, images, count, replace, ignore_missing, do_render)
 
