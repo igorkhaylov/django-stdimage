@@ -1,89 +1,14 @@
-[![version](https://img.shields.io/pypi/v/django-stdimage.svg)](https://pypi.python.org/pypi/django-stdimage/)
-[![codecov](https://codecov.io/gh/codingjoe/django-stdimage/branch/master/graph/badge.svg)](https://codecov.io/gh/codingjoe/django-stdimage)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Fork of](https://img.shields.io/badge/fork%20of-codingjoe%2Fdjango--stdimage-blue)](https://github.com/codingjoe/django-stdimage)
 
 # Django Standardized Image Field
 
-This package has been deprecated in favor of [django-pictures][django-pictures].
+> **This is a maintained fork** of [codingjoe/django-stdimage](https://github.com/codingjoe/django-stdimage)
+> with compatibility fixes for Django 5+, WebP output support, and other improvements.
+> Source: [github.com/igorkhaylov/django-stdimage](https://github.com/igorkhaylov/django-stdimage)
 
-## Migration Instructions
-
-First, make sure you understand the differences between the two packages and
-how to serve images in a modern web application via the [picture][picture-tag]-Element.
-
-Next, follow the setup instructions for [django-pictures][django-pictures].
-
-Once you are set up, change your models to use the new `PictureField` and provide the
- `aspect_ratios` you'd like to serve. Do create migrations just yet.
-
-This step should be followed by changing your templates and frontend.
-The new placeholders feature for local development should help you
-to do this almost effortlessly.
-
-Finally, run `makemigrations` and replace the `AlterField` operation with
-`AlterPictureField`.
-
-We highly recommend to use Django's `image_width` and `image_height` fields, to avoid
-unnecessary IO. If you can add these fields to your model, you can use the following
-snippet to populate them:
-
-```python
-import django.core.files.storage
-from django.db import migrations, models
-import pictures.models
-from pictures.migrations import AlterPictureField
-
-def forward(apps, schema_editor):
-    for obj in apps.get_model("my-app.MyModel").objects.all().iterator():
-        obj.image_width = obj.logo.width
-        obj.image_height = obj.logo.height
-        obj.save(update_fields=["image_height", "image_width"])
-
-def backward(apps, schema_editor):
-    apps.get_model("my-app.MyModel").objects.all().update(
-        image_width=None,
-        image_height=None,
-    )
-
-class Migration(migrations.Migration):
-    dependencies = [
-        ('my-app', '0001_initial'),
-    ]
-
-    operations = [
-        migrations.AddField(
-            model_name="mymodel",
-            name="image_height",
-            field=models.PositiveIntegerField(editable=False, null=True),
-        ),
-        migrations.AddField(
-            model_name="mymodel",
-            name="image_width",
-            field=models.PositiveIntegerField(editable=False, null=True),
-        ),
-        migrations.RunPython(forward, backward),
-        AlterPictureField(
-            model_name="mymodel",
-            name="image",
-            field=pictures.models.PictureField(
-                aspect_ratios=["3/2", "3/1"],
-                breakpoints={"desktop": 1024, "mobile": 576},
-                container_width=1200,
-                file_types=["WEBP"],
-                grid_columns=12,
-                height_field="image_height",
-                pixel_densities=[1, 2],
-                storage=django.core.files.storage.FileSystemStorage(),
-                upload_to="pictures/",
-                verbose_name="image",
-                width_field="image_width",
-            ),
-        ),
-    ]
-```
-
-[django-pictures]: https://github.com/codingjoe/django-pictures
-[picture-tag]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/picture
+> **Note:** If you are starting a new project, consider [django-pictures](https://github.com/codingjoe/django-pictures) —
+> a modern alternative with responsive image support.
 
 ## Why would I want this?
 
@@ -107,15 +32,71 @@ Django Standardized Image Field implements the following features:
 
 ## Installation
 
-Simply install the latest stable package using the following command:
+This fork is **not published on PyPI**. Install directly from GitHub.
+
+### pip
 
 ```bash
-pip install django-stdimage
-# or
-pipenv install django-stdimage
+pip install git+https://github.com/igorkhaylov/django-stdimage.git@master
 ```
 
-and add `'stdimage'` to `INSTALLED_APP`s in your settings.py, that's it!
+With optional extras:
+
+```bash
+# With progressbar support for the rendervariations command
+pip install "git+https://github.com/igorkhaylov/django-stdimage.git@master#egg=django-stdimage[progressbar]"
+
+# With Django REST Framework serializer
+pip install "git+https://github.com/igorkhaylov/django-stdimage.git@master#egg=django-stdimage[drf]"
+```
+
+### uv
+
+```bash
+uv add git+https://github.com/igorkhaylov/django-stdimage.git
+```
+
+### Poetry
+
+```bash
+poetry add git+https://github.com/igorkhaylov/django-stdimage.git
+```
+
+Or add manually to `pyproject.toml`:
+
+```toml
+[tool.poetry.dependencies]
+django-stdimage = { git = "https://github.com/igorkhaylov/django-stdimage.git", branch = "master" }
+```
+
+### PDM
+
+```bash
+pdm add git+https://github.com/igorkhaylov/django-stdimage.git
+```
+
+### Pipenv
+
+```bash
+pipenv install git+https://github.com/igorkhaylov/django-stdimage.git#egg=django-stdimage
+```
+
+### requirements.txt
+
+```
+django-stdimage @ git+https://github.com/igorkhaylov/django-stdimage.git@master
+```
+
+---
+
+After installation, add `'stdimage'` to `INSTALLED_APPS` in your `settings.py`:
+
+```python
+INSTALLED_APPS = [
+    ...
+    'stdimage',
+]
+```
 
 ## Usage
 
