@@ -20,7 +20,7 @@ class StdImageSerializer(serializers.ImageField):
         field = obj.field
         if hasattr(field, "variations"):
             for key in field.variations:
-                variation = getattr(obj, key)
+                variation = getattr(obj, key, None)
                 if variation and hasattr(variation, "url"):
                     result[key] = super().to_representation(variation)
 
