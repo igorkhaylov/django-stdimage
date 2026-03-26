@@ -62,6 +62,7 @@ class StdImageFieldFile(ImageFieldFile):
             raise TypeError(msg)
         if render_variations:
             self.render_variations()
+            self.field.set_variations(self.instance)
 
     @staticmethod
     def is_smaller(img, variation):
