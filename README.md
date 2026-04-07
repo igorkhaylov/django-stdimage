@@ -37,54 +37,54 @@ This fork is **not published on PyPI**. Install directly from GitHub.
 ### pip
 
 ```bash
-pip install git+https://github.com/igorkhaylov/django-stdimage.git@master
+pip install git+https://github.com/igorkhaylov/django-stdimage.git@v1.0.2
 ```
 
 With optional extras:
 
 ```bash
 # With progressbar support for the rendervariations command
-pip install "git+https://github.com/igorkhaylov/django-stdimage.git@master#egg=django-stdimage[progressbar]"
+pip install "git+https://github.com/igorkhaylov/django-stdimage.git@v1.0.2#egg=django-stdimage[progressbar]"
 
 # With Django REST Framework serializer
-pip install "git+https://github.com/igorkhaylov/django-stdimage.git@master#egg=django-stdimage[drf]"
-```
-
-### uv
-
-```bash
-uv add git+https://github.com/igorkhaylov/django-stdimage.git
+pip install "git+https://github.com/igorkhaylov/django-stdimage.git@v1.0.2#egg=django-stdimage[drf]"
 ```
 
 ### Poetry
 
 ```bash
-poetry add git+https://github.com/igorkhaylov/django-stdimage.git
+poetry add git+https://github.com/igorkhaylov/django-stdimage.git@v1.0.2
 ```
 
 Or add manually to `pyproject.toml`:
 
 ```toml
 [tool.poetry.dependencies]
-django-stdimage = { git = "https://github.com/igorkhaylov/django-stdimage.git", branch = "master" }
+django-stdimage = { git = "https://github.com/igorkhaylov/django-stdimage.git", tag = "v1.0.2" }
+```
+
+### uv
+
+```bash
+uv add git+https://github.com/igorkhaylov/django-stdimage.git@v1.0.2
 ```
 
 ### PDM
 
 ```bash
-pdm add git+https://github.com/igorkhaylov/django-stdimage.git
+pdm add git+https://github.com/igorkhaylov/django-stdimage.git@v1.0.2
 ```
 
 ### Pipenv
 
 ```bash
-pipenv install git+https://github.com/igorkhaylov/django-stdimage.git#egg=django-stdimage
+pipenv install git+https://github.com/igorkhaylov/django-stdimage.git@v1.0.2#egg=django-stdimage
 ```
 
 ### requirements.txt
 
 ```
-django-stdimage @ git+https://github.com/igorkhaylov/django-stdimage.git@master
+django-stdimage @ git+https://github.com/igorkhaylov/django-stdimage.git@v1.0.2
 ```
 
 ---
@@ -100,17 +100,91 @@ INSTALLED_APPS = [
 
 ## Usage
 
-Now it's installed you can use either: `StdImageField` or `JPEGField`.
-
 `StdImageField` works just like Django's own
 [ImageField](https://docs.djangoproject.com/en/dev/ref/models/fields/#imagefield)
-except that you can specify different size variations.
+except that it automatically generates size variations of uploaded images.
 
-The `JPEGField` is identical to the `StdImageField` but all images are
-converted to JPEGs, no matter what type the original file is.
+### Quick start
 
-### Variations
+The simplest usage requires no configuration — default variations are included out of the box:
 
+```python
+from django.db import models
+from stdimage import StdImageField
+
+
+class MyModel(models.Model):
+    image = StdImageField(upload_to='path/to/img')
+```
+
+This will automatically create the following variations for every uploaded image:
+
+| Variation     | Width  | Height | Crop  |
+|---------------|--------|--------|-------|
+| `thumbnail`   | 100px  | 100px  | Yes   |
+| `small`       | 400px  | auto   | No    |
+| `medium`      | 800px  | auto   | No    |
+| `large`       | 1920px | auto   | No    |
+
+All variations are saved in **WebP** format with quality 85.
+
+Access variations on the model instance:
+
+```python
+obj = MyModel.objects.get(pk=1)
+
+obj.image.url            # original image
+obj.image.thumbnail.url  # 100x100 cropped thumbnail
+obj.image.small.url      # 400px wide
+obj.image.medium.url     # 800px wide
+obj.image.large.url      # 1920px wide
+```
+
+In templates:
+
+```html
+<img src="{{ object.image.thumbnail.url }}" alt="">
+<img src="{{ object.image.medium.url }}" alt="">
+```
+
+### DRF Serializer
+
+The package includes a serializer for Django REST Framework. Install with the `drf` extra (see Installation above).
+
+```python
+from rest_framework import serializers
+from stdimage.serializers import StdImageSerializer
+
+from .models import MyModel
+
+
+class MyModelSerializer(serializers.ModelSerializer):
+    image = StdImageSerializer()
+
+    class Meta:
+        model = MyModel
+        fields = '__all__'
+```
+
+The serializer returns a dictionary with URLs for the original image and each variation:
+
+```json
+{
+    "image": {
+        "original": "/media/path/to/img/image.jpg",
+        "thumbnail": "/media/path/to/img/image.thumbnail.webp",
+        "small": "/media/path/to/img/image.small.webp",
+        "medium": "/media/path/to/img/image.medium.webp",
+        "large": "/media/path/to/img/image.large.webp"
+    }
+}
+```
+
+If the image field is empty, the serializer returns `null`.
+
+### Custom variations
+
+You can also define your own variations instead of using the defaults.
 Variations are specified within a dictionary. The key will be the attribute referencing the resized image.
 A variation can be defined both as a tuple or a dictionary.
 
@@ -151,13 +225,7 @@ class MyModel(models.Model):
     }, delete_orphans=True)
 ```
 
-To use these variations in templates use `myimagefield.variation_name`.
-
-Example:
-
-```html
-<a href="{{ object.myimage.url }}"><img alt="" src="{{ object.myimage.thumbnail.url }}"/></a>
-```
+`JPEGField` is identical to `StdImageField` but converts all images to JPEG format regardless of the original file type.
 
 ### Upload to function
 
