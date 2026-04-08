@@ -26,7 +26,9 @@ class compile_translations(Command):
         pattern = "stdimage/locale/*/LC_MESSAGES/django.po"
         for file in glob.glob(pattern):
             name, ext = os.path.splitext(file)
-            cmd = ["msgfmt", "-c", "-o", f"{self.build_lib}/{name}.mo", file]
+            output_file = f"{self.build_lib}/{name}.mo"
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            cmd = ["msgfmt", "-c", "-o", output_file, file]
             self.announce(
                 "running command: %s" % " ".join(cmd), level=distutils.log.INFO
             )

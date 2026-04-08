@@ -1,6 +1,5 @@
 import logging
 import os
-import warnings
 from io import BytesIO
 
 from django.core.files.base import ContentFile
@@ -62,7 +61,7 @@ class StdImageFieldFile(ImageFieldFile):
             raise TypeError(msg)
         if render_variations:
             self.render_variations()
-            self.field.set_variations(self.instance)
+        self.field.set_variations(self.instance)
 
     @staticmethod
     def is_smaller(img, variation):
@@ -150,7 +149,7 @@ class StdImageFieldFile(ImageFieldFile):
             "quality": 85,  # near-lossless for photos; good size/quality balance
             "method": 4,  # compression effort 0-6: 4 is the balanced default
         }
-        save_kargs.update(variation["kwargs"])
+        save_kargs.update(variation.get("kwargs", {}))
         return image, save_kargs
 
     @classmethod
@@ -406,7 +405,7 @@ class JPEGFieldFile(StdImageFieldFile):
         else:
             image.thumbnail(size, resample=resample)
 
-        save_kargs.update(variation["kwargs"])
+        save_kargs.update(variation.get("kwargs", {}))
 
         return image, save_kargs
 

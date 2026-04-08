@@ -89,18 +89,18 @@ class TestModel(TestStdImage):
             source_file.seek(0)
             assert source_file.read() == f.read()
 
-        path = os.path.join(IMG_DIR, "600x400.medium.jpg")
+        path = os.path.join(IMG_DIR, "600x400.medium.webp")
         assert os.path.exists(path)
         assert instance.image.medium.width == 400
         assert instance.image.medium.height <= 400
-        with open(os.path.join(IMG_DIR, "600x400.medium.jpg"), "rb") as f:
+        with open(os.path.join(IMG_DIR, "600x400.medium.webp"), "rb") as f:
             source_file.seek(0)
             assert source_file.read() != f.read()
 
-        assert os.path.exists(os.path.join(IMG_DIR, "600x400.thumbnail.jpg"))
+        assert os.path.exists(os.path.join(IMG_DIR, "600x400.thumbnail.webp"))
         assert instance.image.thumbnail.width == 100
         assert instance.image.thumbnail.height <= 75
-        with open(os.path.join(IMG_DIR, "600x400.thumbnail.jpg"), "rb") as f:
+        with open(os.path.join(IMG_DIR, "600x400.thumbnail.webp"), "rb") as f:
             source_file.seek(0)
             assert source_file.read() != f.read()
 
@@ -111,13 +111,13 @@ class TestModel(TestStdImage):
 
     def test_variations_override(self, db):
         source_file = self.fixtures["600x400.jpg"]
-        target_file = os.path.join(IMG_DIR, "image.thumbnail.jpg")
+        target_file = "img/image.thumbnail.webp"
         os.mkdir(IMG_DIR)
         default_storage.save(target_file, source_file)
         ResizeModel.objects.create(image=self.fixtures["600x400.jpg"])
-        thumbnail_path = os.path.join(IMG_DIR, "image.thumbnail.jpg")
+        thumbnail_path = os.path.join(IMG_DIR, "image.thumbnail.webp")
         assert os.path.exists(thumbnail_path)
-        thumbnail_path = os.path.join(IMG_DIR, "image.thumbnail_1.jpg")
+        thumbnail_path = os.path.join(IMG_DIR, "image.thumbnail_1.webp")
         assert not os.path.exists(thumbnail_path)
 
     def test_delete_thumbnail(self, db):
@@ -148,7 +148,7 @@ class TestModel(TestStdImage):
         # Our model saves the images directly into the MEDIA_ROOT directory
         # not IMG_DIR, under a custom name
         original = os.path.join(settings.MEDIA_ROOT, "custom.gif")
-        thumbnail = os.path.join(settings.MEDIA_ROOT, "custom.thumbnail.gif")
+        thumbnail = os.path.join(settings.MEDIA_ROOT, "custom.thumbnail.webp")
         assert os.path.exists(original)
         assert os.path.exists(thumbnail)
 
@@ -214,18 +214,18 @@ class TestModel(TestStdImage):
             source_file.seek(0)
             assert source_file.read() == f.read()
 
-        path = os.path.join(IMG_DIR, "600x400.medium.jpg")
+        path = os.path.join(IMG_DIR, "600x400.medium.webp")
         assert os.path.exists(path)
         assert instance.image.medium.width == 400
         assert instance.image.medium.height <= 400
-        with open(os.path.join(IMG_DIR, "600x400.medium.jpg"), "rb") as f:
+        with open(os.path.join(IMG_DIR, "600x400.medium.webp"), "rb") as f:
             source_file.seek(0)
             assert source_file.read() != f.read()
 
-        assert os.path.exists(os.path.join(IMG_DIR, "600x400.thumbnail.jpg"))
+        assert os.path.exists(os.path.join(IMG_DIR, "600x400.thumbnail.webp"))
         assert instance.image.thumbnail.width == 100
         assert instance.image.thumbnail.height <= 75
-        with open(os.path.join(IMG_DIR, "600x400.thumbnail.jpg"), "rb") as f:
+        with open(os.path.join(IMG_DIR, "600x400.thumbnail.webp"), "rb") as f:
             source_file.seek(0)
             assert source_file.read() != f.read()
 
