@@ -10,7 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.fields.files import ImageFieldFile
 from PIL import Image
 
-from stdimage.models import StdImageFieldFile
+from stdimage.models import StdImageField, StdImageFieldFile
 
 from . import models
 from .models import (
@@ -339,3 +339,47 @@ class TestJPEGField(TestStdImage):
 
         assert large.image.full.width == 600
         assert small.image.full.width == 100
+
+
+class TestDefaultVariationsSetting:
+    """``variations`` omitted on a field: settings.STDIMAGE_DEFAULT_VARIATIONS wins over
+    the built-in DEFAULT_VARIATIONS, and only when the setting is not defined do the
+    built-in defaults apply."""
+
+    def test_builtin_defaults_when_setting_is_absent(self, settings):
+        assert not hasattr(settings, "STDIMAGE_DEFAULT_VARIATIONS")
+        field = StdImageField(upload_to="img/")
+        assert set(field.variations) == {"thumbnail", "small", "medium", "large"}
+        assert field.variations["thumbnail"]["crop"] is True
+
+    def test_setting_replaces_builtin_defaults(self, settings):
+        settings.STDIMAGE_DEFAULT_VARIATIONS = {
+            "preview": {"width": 50, "height": 50, "crop": True},
+            "wide": (1200, None),
+        }
+        field = StdImageField(upload_to="img/")
+        assert set(field.variations) == {"preview", "wide"}
+        assert field.variations["preview"]["crop"] is True
+        assert field.variations["wide"]["width"] == 1200
+
+    def test_empty_setting_means_no_default_variations(self, settings):
+        settings.STDIMAGE_DEFAULT_VARIATIONS = {}
+        field = StdImageField(upload_to="img/")
+        assert field.variations == {}
+
+    def test_none_setting_falls_back_to_builtin_defaults(self, settings):
+        settings.STDIMAGE_DEFAULT_VARIATIONS = None
+        field = StdImageField(upload_to="img/")
+        assert set(field.variations) == {"thumbnail", "small", "medium", "large"}
+
+    def test_explicit_variations_win_over_the_setting(self, settings):
+        settings.STDIMAGE_DEFAULT_VARIATIONS = {"preview": {"width": 50, "height": 50}}
+        field = StdImageField(upload_to="img/", variations={"thumbnail": (100, 75)})
+        assert set(field.variations) == {"thumbnail"}
+
+    def test_invalid_setting_raises(self, settings):
+        from django.core.exceptions import ImproperlyConfigured
+
+        settings.STDIMAGE_DEFAULT_VARIATIONS = ["thumbnail"]
+        with pytest.raises(ImproperlyConfigured):
+            StdImageField(upload_to="img/")

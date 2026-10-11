@@ -2,6 +2,8 @@ import logging
 import os
 from io import BytesIO
 
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db.models import signals
@@ -19,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Default variations used when none are specified.
+# Built-in default variations, used by fields declared without ``variations=`` when
+# the project does not define ``STDIMAGE_DEFAULT_VARIATIONS`` in its settings.
 # Covers the most common use cases for web projects:
 #   thumbnail — cropped square for avatars and grid previews
 #   small     — proportional resize for cards and listings
@@ -31,6 +34,30 @@ DEFAULT_VARIATIONS = {
     "medium": {"width": 800, "height": None},
     "large": {"width": 1920, "height": None},
 }
+
+# Name of the Django setting that overrides DEFAULT_VARIATIONS project-wide.
+DEFAULT_VARIATIONS_SETTING = "STDIMAGE_DEFAULT_VARIATIONS"
+
+
+def get_default_variations():
+    """Return the variations for fields declared without ``variations=``.
+
+    ``settings.STDIMAGE_DEFAULT_VARIATIONS`` wins when it is defined: a dict of the
+    same shape as the ``variations`` argument (``{}`` means "no variations by
+    default"). When the setting is absent (or ``None``) the built-in
+    ``DEFAULT_VARIATIONS`` are used. Read at field creation, i.e. when models are
+    imported, so settings are always configured by then.
+    """
+    configured = getattr(settings, DEFAULT_VARIATIONS_SETTING, None)
+    if configured is None:
+        return DEFAULT_VARIATIONS
+    if not isinstance(configured, dict):
+        raise ImproperlyConfigured(
+            "settings.%s must be a dict of variations (e.g. "
+            '{"thumbnail": {"width": 100, "height": 100, "crop": True}}), got %s'
+            % (DEFAULT_VARIATIONS_SETTING, type(configured))
+        )
+    return configured
 
 
 class StdImageFileDescriptor(ImageFileDescriptor):
@@ -239,7 +266,9 @@ class StdImageField(ImageField):
 
         Args:
             variations (dict):
-                Different size variations of the image.
+                Different size variations of the image. When omitted, the project's
+                ``settings.STDIMAGE_DEFAULT_VARIATIONS`` is used, or the built-in
+                defaults when that setting is not defined. Pass ``{}`` for none.
             render_variations (bool, callable):
                 Boolean or callable that returns a boolean. If True, the built-in
                 image render will be used. The callable gets passed the ``app_name``,
@@ -252,7 +281,7 @@ class StdImageField(ImageField):
 
         """
         if variations is None:
-            variations = DEFAULT_VARIATIONS
+            variations = get_default_variations()
         elif not variations:
             variations = {}
         if not isinstance(variations, dict):

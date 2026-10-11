@@ -128,6 +128,32 @@ This will automatically create the following variations for every uploaded image
 
 All variations are saved in **WebP** format with quality 85.
 
+#### Project-wide default variations
+
+To use a different default set for every `StdImageField` that does not declare its own
+`variations`, define `STDIMAGE_DEFAULT_VARIATIONS` in your Django settings. It has the
+same shape as the `variations` argument (dicts or `(width, height, crop)` tuples):
+
+```python
+# settings.py
+STDIMAGE_DEFAULT_VARIATIONS = {
+    "thumbnail": {"width": 150, "height": 150, "crop": True},
+    "card": {"width": 600, "height": None},
+}
+```
+
+Resolution order for a field declared without `variations`:
+
+1. `variations=...` passed to the field (always wins; `variations={}` means none);
+2. `settings.STDIMAGE_DEFAULT_VARIATIONS`, when the setting is defined (`{}` disables
+   default variations project-wide);
+3. the built-in defaults from the table above, when the setting is not defined.
+
+The resolved set is read when the field is created (model import time) and, like
+explicit variations, it is written into migrations — changing the setting later is an
+`AlterField` for every affected field (`makemigrations`), and existing files need
+`rendervariations` to produce the new sizes.
+
 Access variations on the model instance:
 
 ```python
